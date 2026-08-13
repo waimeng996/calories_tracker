@@ -20,6 +20,11 @@ export default function InsulinLogPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const unitsNum = Number(units);
+    if (!(unitsNum > 0)) {
+      setError('Units must be a positive number');
+      return;
+    }
     setSaving(true);
     setError(null);
     const supabase = createBrowserSupabase();
@@ -31,7 +36,7 @@ export default function InsulinLogPage() {
     }
     const { error: insertError } = await supabase.from('insulin_logs').insert({
       user_id: user.id,
-      units: Number(units),
+      units: unitsNum,
       logged_at: new Date(loggedAt).toISOString(),
       note: note || null,
     });
@@ -51,6 +56,7 @@ export default function InsulinLogPage() {
         <input
           type="number"
           step="0.5"
+          min="0"
           required
           placeholder="Units"
           className="w-full rounded border px-3 py-2"
