@@ -1,3 +1,5 @@
+import { toMalaysiaLocal } from './date';
+
 export type Sex = 'male' | 'female';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
 export type Goal = 'lose' | 'maintain' | 'gain';
@@ -51,7 +53,7 @@ export function calculateTDEE(input: ProfileInput): number {
 
 export function calculateDailyTargets(input: ProfileInput, dailyCalorieAdjustment: number): DailyTargets {
   const rawCalories = calculateTDEE(input) + dailyCalorieAdjustment;
-  const calories = Math.max(rawCalories, MIN_SAFE_CALORIES);
+  const calories = Math.round(Math.max(rawCalories, MIN_SAFE_CALORIES));
   return {
     calories,
     carbsG: Math.round((calories * CARB_RATIO) / KCAL_PER_G_CARB),
@@ -77,7 +79,9 @@ export interface GoalCheckResult {
 }
 
 export function checkGoalSafety(input: GoalCheckInput): GoalCheckResult {
-  const today = new Date(input.today ?? new Date().toISOString().slice(0, 10));
+  // Default "today" uses Malaysia local date (not server-process TZ / UTC date-slice),
+  // consistent with lib/date.ts's day-boundary handling elsewhere in the app.
+  const today = new Date(input.today ?? toMalaysiaLocal(new Date().toISOString()).dateKey);
   const targetDate = new Date(input.targetDate);
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
   const weeks = Math.max((targetDate.getTime() - today.getTime()) / msPerWeek, 1 / 7);

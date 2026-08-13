@@ -1,21 +1,6 @@
 import { createServerSupabase } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-
-// Server process TZ may not match the user's TZ (e.g. UTC on serverless hosts),
-// so each row's calendar day is bucketed in fixed Malaysia local time, not
-// server local time (mirrors the offset math in app/(app)/page.tsx).
-const MALAYSIA_UTC_OFFSET_HOURS = 8; // Asia/Kuala_Lumpur, UTC+8, no DST
-
-function toMalaysiaLocal(isoString: string) {
-  const offsetMs = MALAYSIA_UTC_OFFSET_HOURS * 60 * 60 * 1000;
-  const shifted = new Date(new Date(isoString).getTime() + offsetMs); // wall-clock time in that TZ, expressed as if UTC
-  const y = shifted.getUTCFullYear();
-  const mo = String(shifted.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(shifted.getUTCDate()).padStart(2, '0');
-  const hh = String(shifted.getUTCHours()).padStart(2, '0');
-  const mm = String(shifted.getUTCMinutes()).padStart(2, '0');
-  return { dateKey: `${y}-${mo}-${d}`, timeStr: `${hh}:${mm}` };
-}
+import { toMalaysiaLocal } from '@/lib/date';
 
 interface DayGroup {
   date: string;

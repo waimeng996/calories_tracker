@@ -1,27 +1,7 @@
 import { createServerSupabase } from '@/lib/supabase/server';
 import DailyRing from '@/components/DailyRing';
 import { redirect } from 'next/navigation';
-
-// Server process TZ may not match the user's TZ (e.g. UTC on serverless hosts),
-// so "today" is computed in fixed Malaysia local time, not server local time.
-const MALAYSIA_UTC_OFFSET_HOURS = 8; // Asia/Kuala_Lumpur, UTC+8, no DST
-
-function todayRangeInTimezone(offsetHours: number) {
-  const offsetMs = offsetHours * 60 * 60 * 1000;
-  const shiftedNow = new Date(Date.now() + offsetMs); // wall-clock time in that TZ, expressed as if UTC
-  const start = new Date(shiftedNow);
-  start.setUTCHours(0, 0, 0, 0);
-  const end = new Date(shiftedNow);
-  end.setUTCHours(23, 59, 59, 999);
-  return {
-    start: new Date(start.getTime() - offsetMs).toISOString(),
-    end: new Date(end.getTime() - offsetMs).toISOString(),
-  };
-}
-
-function todayRange() {
-  return todayRangeInTimezone(MALAYSIA_UTC_OFFSET_HOURS);
-}
+import { todayRangeInTimezone, toMalaysiaLocal } from '@/lib/date';
 
 export default async function DashboardPage() {
   const supabase = createServerSupabase();
@@ -31,7 +11,7 @@ export default async function DashboardPage() {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
   if (!profile) redirect('/onboarding');
 
-  const { start, end } = todayRange();
+  const { start, end } = todayRangeInTimezone();
   const { data: meals } = await supabase
     .from('meal_logs')
     .select('*')
@@ -60,6 +40,11 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-md space-y-4 p-6">
+      {profile.goal_override_accepted && (
+        <div className="rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
+          ⚠️ 你嘅目标速度超出安全建议, 请咨询医生
+        </div>
+      )}
       <h1 className="text-xl font-semibold">今日</h1>
       <DailyRing label="Calories" consumed={consumed.calories} target={Number(profile.daily_calories)} unit="kcal" />
       <DailyRing label="Carbs" consumed={consumed.carbs} target={Number(profile.daily_carbs_g)} unit="g" />
@@ -71,7 +56,7 @@ export default async function DashboardPage() {
         <ul className="mt-2 space-y-2">
           {(meals ?? []).map((m) => (
             <li key={m.id} className="rounded border p-2 text-sm">
-              {new Date(m.logged_at).toLocaleTimeString()} — {m.ai_raw_description || '未命名'} — {m.calories} kcal
+              {toMalaysiaLocal(m.logged_at).timeStr} — {m.ai_raw_description || '未命名'} — {m.calories} kcal
             </li>
           ))}
           {(meals ?? []).length === 0 && <li className="text-sm text-gray-500">未有记录</li>}
@@ -83,7 +68,7 @@ export default async function DashboardPage() {
         <ul className="mt-2 space-y-2">
           {(insulinDoses ?? []).map((i) => (
             <li key={i.id} className="rounded border p-2 text-sm">
-              {new Date(i.logged_at).toLocaleTimeString()} — {i.units} units {i.note ? `(${i.note})` : ''}
+              {toMalaysiaLocal(i.logged_at).timeStr} — {i.units} units {i.note ? `(${i.note})` : ''}
             </li>
           ))}
           {(insulinDoses ?? []).length === 0 && <li className="text-sm text-gray-500">未有记录</li>}
