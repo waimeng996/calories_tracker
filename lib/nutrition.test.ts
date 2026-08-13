@@ -29,7 +29,8 @@ describe('calculateDailyTargets', () => {
     const input = { age: 30, weightKg: 70, heightCm: 175, sex: 'male' as const, activityLevel: 'sedentary' as const };
     const targets = calculateDailyTargets(input, 0);
     const tdee = calculateTDEE(input);
-    expect(targets.calories).toBeCloseTo(tdee, 0);
+    // calories is rounded to a whole number for display; compare against the rounded TDEE.
+    expect(targets.calories).toBe(Math.round(tdee));
     // carbs 47.5% of calories / 4 kcal per g
     expect(targets.carbsG).toBeCloseTo((tdee * 0.475) / 4, 0);
     expect(targets.proteinG).toBeCloseTo((tdee * 0.225) / 4, 0);
@@ -40,7 +41,7 @@ describe('calculateDailyTargets', () => {
     const input = { age: 30, weightKg: 70, heightCm: 175, sex: 'male' as const, activityLevel: 'sedentary' as const };
     const tdee = calculateTDEE(input);
     const targets = calculateDailyTargets(input, -500);
-    expect(targets.calories).toBeCloseTo(tdee - 500, 0);
+    expect(targets.calories).toBe(Math.round(tdee - 500));
   });
 
   it('never returns a calorie target below 1200', () => {
