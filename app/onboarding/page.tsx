@@ -48,7 +48,7 @@ export default function OnboardingPage() {
     return (direction * result.requestedWeeklyChangeKg * KCAL_PER_KG_FAT) / 7;
   }
 
-  async function saveProfile(dailyCalorieAdjustment: number, effectiveTargetDate: string | null) {
+  async function saveProfile(dailyCalorieAdjustment: number, effectiveTargetDate: string | null, overrideAccepted: boolean) {
     setError(null);
     setSaving(true);
 
@@ -75,6 +75,7 @@ export default function OnboardingPage() {
       daily_carbs_g: targets.carbsG,
       daily_protein_g: targets.proteinG,
       daily_fat_g: targets.fatG,
+      goal_override_accepted: overrideAccepted,
       updated_at: new Date().toISOString(),
     });
 
@@ -92,7 +93,7 @@ export default function OnboardingPage() {
 
     if (goal === 'maintain' || !targetWeightKg || !targetDate) {
       setSafetyResult(null);
-      await saveProfile(0, null);
+      await saveProfile(0, null, false);
       return;
     }
 
@@ -111,7 +112,7 @@ export default function OnboardingPage() {
 
     setSafetyResult(null);
     const adjustment = result.isSafe ? result.safeDailyCalorieAdjustment : requestedDailyCalorieAdjustment(result);
-    await saveProfile(adjustment, targetDate);
+    await saveProfile(adjustment, targetDate, !result.isSafe);
   }
 
   async function handleAdoptSafeSuggestion() {
@@ -121,7 +122,7 @@ export default function OnboardingPage() {
     setTargetDate(suggestedDate);
     setAcceptedOverride(false);
     setSafetyResult(null);
-    await saveProfile(adjustment, suggestedDate);
+    await saveProfile(adjustment, suggestedDate, false);
   }
 
   return (
