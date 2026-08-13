@@ -2,12 +2,25 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import DailyRing from '@/components/DailyRing';
 import { redirect } from 'next/navigation';
 
+// Server process TZ may not match the user's TZ (e.g. UTC on serverless hosts),
+// so "today" is computed in fixed Malaysia local time, not server local time.
+const MALAYSIA_UTC_OFFSET_HOURS = 8; // Asia/Kuala_Lumpur, UTC+8, no DST
+
+function todayRangeInTimezone(offsetHours: number) {
+  const offsetMs = offsetHours * 60 * 60 * 1000;
+  const shiftedNow = new Date(Date.now() + offsetMs); // wall-clock time in that TZ, expressed as if UTC
+  const start = new Date(shiftedNow);
+  start.setUTCHours(0, 0, 0, 0);
+  const end = new Date(shiftedNow);
+  end.setUTCHours(23, 59, 59, 999);
+  return {
+    start: new Date(start.getTime() - offsetMs).toISOString(),
+    end: new Date(end.getTime() - offsetMs).toISOString(),
+  };
+}
+
 function todayRange() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-  return { start: start.toISOString(), end: end.toISOString() };
+  return todayRangeInTimezone(MALAYSIA_UTC_OFFSET_HOURS);
 }
 
 export default async function DashboardPage() {
