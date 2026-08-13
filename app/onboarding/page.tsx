@@ -8,8 +8,14 @@ import {
   checkGoalSafety,
   type ActivityLevel,
   type Goal,
+  type GoalCheckResult,
   type Sex,
 } from '@/lib/nutrition';
+
+// Mirrors lib/nutrition.ts's private KCAL_PER_KG_FAT constant. Needed here to derive the
+// user's actually-requested (uncapped) daily calorie adjustment for the override path —
+// checkGoalSafety only ever returns the capped/safe adjustment.
+const KCAL_PER_KG_FAT = 7700;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -21,9 +27,8 @@ export default function OnboardingPage() {
   const [goal, setGoal] = useState<Goal>('maintain');
   const [targetWeightKg, setTargetWeightKg] = useState('');
   const [targetDate, setTargetDate] = useState('');
-  const [safetyWarning, setSafetyWarning] = useState<string | null>(null);
+  const [safetyResult, setSafetyResult] = useState<GoalCheckResult | null>(null);
   const [acceptedOverride, setAcceptedOverride] = useState(false);
-  const [dailyAdjustment, setDailyAdjustment] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -35,40 +40,19 @@ export default function OnboardingPage() {
     activityLevel,
   };
 
-  function runSafetyCheck(): number {
-    if (goal === 'maintain' || !targetWeightKg || !targetDate) {
-      setSafetyWarning(null);
-      return 0;
-    }
-    const result = checkGoalSafety({
-      currentWeightKg: Number(weightKg),
-      targetWeightKg: Number(targetWeightKg),
-      targetDate,
-    });
-    if (!result.isSafe && !acceptedOverride) {
-      setSafetyWarning(
-        `呢个速度唔安全: 需要每周${result.requestedWeeklyChangeKg.toFixed(2)}kg, 建议上限每周${result.maxSafeWeeklyChangeKg.toFixed(2)}kg。` +
-          `建议目标日期改做 ${result.suggestedTargetDate}, 或以安全速率继续。`
-      );
-    } else {
-      setSafetyWarning(null);
-    }
-    return result.safeDailyCalorieAdjustment;
+  // Requested (uncapped) daily calorie adjustment, signed the same way checkGoalSafety
+  // signs safeDailyCalorieAdjustment (negative = loss, positive = gain), but built from
+  // the user's actual requested weekly rate instead of the capped one.
+  function requestedDailyCalorieAdjustment(result: GoalCheckResult): number {
+    const direction = Number(targetWeightKg) >= Number(weightKg) ? 1 : -1;
+    return (direction * result.requestedWeeklyChangeKg * KCAL_PER_KG_FAT) / 7;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function saveProfile(dailyCalorieAdjustment: number, effectiveTargetDate: string | null) {
     setError(null);
-
-    const adjustment = runSafetyCheck();
-    if (safetyWarning && !acceptedOverride) {
-      return; // block save until user accepts suggestion or overrides
-    }
-
-    setDailyAdjustment(adjustment);
     setSaving(true);
 
-    const targets = calculateDailyTargets(profileInput, adjustment);
+    const targets = calculateDailyTargets(profileInput, dailyCalorieAdjustment);
     const supabase = createBrowserSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -86,7 +70,7 @@ export default function OnboardingPage() {
       activity_level: profileInput.activityLevel,
       goal,
       target_weight_kg: goal === 'maintain' ? null : Number(targetWeightKg),
-      target_date: goal === 'maintain' ? null : targetDate,
+      target_date: goal === 'maintain' ? null : effectiveTargetDate,
       daily_calories: targets.calories,
       daily_carbs_g: targets.carbsG,
       daily_protein_g: targets.proteinG,
@@ -101,6 +85,43 @@ export default function OnboardingPage() {
     }
     router.push('/');
     router.refresh();
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (goal === 'maintain' || !targetWeightKg || !targetDate) {
+      setSafetyResult(null);
+      await saveProfile(0, null);
+      return;
+    }
+
+    // Always run the safety check as part of submit, and gate on its return value
+    // directly — never on state a previous render set, which may not have applied yet.
+    const result = checkGoalSafety({
+      currentWeightKg: Number(weightKg),
+      targetWeightKg: Number(targetWeightKg),
+      targetDate,
+    });
+
+    if (!result.isSafe && !acceptedOverride) {
+      setSafetyResult(result);
+      return; // block save until the user adopts the safe suggestion or overrides
+    }
+
+    setSafetyResult(null);
+    const adjustment = result.isSafe ? result.safeDailyCalorieAdjustment : requestedDailyCalorieAdjustment(result);
+    await saveProfile(adjustment, targetDate);
+  }
+
+  async function handleAdoptSafeSuggestion() {
+    if (!safetyResult?.suggestedTargetDate) return;
+    const suggestedDate = safetyResult.suggestedTargetDate;
+    const adjustment = safetyResult.safeDailyCalorieAdjustment;
+    setTargetDate(suggestedDate);
+    setAcceptedOverride(false);
+    setSafetyResult(null);
+    await saveProfile(adjustment, suggestedDate);
   }
 
   return (
@@ -132,9 +153,20 @@ export default function OnboardingPage() {
             <input type="date" required className="w-full rounded border px-3 py-2" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
           </>
         )}
-        {safetyWarning && (
+        {safetyResult && !safetyResult.isSafe && (
           <div className="rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
-            <p>{safetyWarning}</p>
+            <p>
+              {`呢个速度唔安全: 需要每周${safetyResult.requestedWeeklyChangeKg.toFixed(2)}kg, 建议上限每周${safetyResult.maxSafeWeeklyChangeKg.toFixed(2)}kg。` +
+                `建议目标日期改做 ${safetyResult.suggestedTargetDate}, 或以安全速率继续。`}
+            </p>
+            <button
+              type="button"
+              onClick={handleAdoptSafeSuggestion}
+              disabled={saving}
+              className="mt-2 w-full rounded border border-amber-700 py-1.5 text-amber-900 disabled:opacity-50"
+            >
+              采用安全建议日期
+            </button>
             <label className="mt-2 flex items-center gap-2">
               <input type="checkbox" checked={acceptedOverride} onChange={(e) => setAcceptedOverride(e.target.checked)} />
               我明白风险, 坚持原计划
@@ -142,13 +174,6 @@ export default function OnboardingPage() {
           </div>
         )}
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="button"
-          onClick={runSafetyCheck}
-          className="w-full rounded border border-gray-900 py-2"
-        >
-          检查目标
-        </button>
         <button type="submit" disabled={saving} className="w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50">
           {saving ? 'Saving…' : 'Save'}
         </button>
