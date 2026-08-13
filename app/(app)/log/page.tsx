@@ -1,17 +1,28 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PhotoCapture from '@/components/PhotoCapture';
 import { compressImage } from '@/lib/image';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { FoodAnalysis } from '@/lib/gemini';
 
-export default function LogMealPage() {
+const MEAL_TYPE_LABELS: Record<string, string> = {
+  breakfast: '早餐',
+  lunch: '午餐',
+  dinner: '晚餐',
+  snack: '小食',
+};
+
+function LogMealForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const mealType = MEAL_TYPE_LABELS[searchParams.get('type') ?? ''] ? searchParams.get('type')! : 'snack';
+
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [insulinUnits, setInsulinUnits] = useState('');
   const [analysis, setAnalysis] = useState<FoodAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -84,6 +95,8 @@ export default function LogMealPage() {
       carbs_g: analysis.carbsG,
       protein_g: analysis.proteinG,
       fat_g: analysis.fatG,
+      meal_type: mealType,
+      insulin_units: insulinUnits ? Number(insulinUnits) : null,
     });
 
     setSaving(false);
@@ -104,7 +117,7 @@ export default function LogMealPage() {
 
   return (
     <main className="mx-auto max-w-md p-6 space-y-4">
-      <h1 className="text-xl font-semibold">记录一餐</h1>
+      <h1 className="text-xl font-semibold">记录: {MEAL_TYPE_LABELS[mealType]}</h1>
 
       {!previewUrl && <PhotoCapture onCapture={handleCapture} />}
 
@@ -156,6 +169,10 @@ export default function LogMealPage() {
             <input type="number" className="mt-1 w-full rounded border px-3 py-2" value={analysis.fatG}
               onChange={(e) => setAnalysis({ ...analysis, fatG: Number(e.target.value) })} />
           </label>
+          <label className="block text-sm">胰岛素 units (可选)
+            <input type="number" min="0" step="0.5" className="mt-1 w-full rounded border px-3 py-2" value={insulinUnits}
+              onChange={(e) => setInsulinUnits(e.target.value)} />
+          </label>
           <button onClick={handleSave} disabled={saving} className="w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50">
             {saving ? 'Saving…' : '确认保存'}
           </button>
@@ -168,5 +185,13 @@ export default function LogMealPage() {
         </p>
       )}
     </main>
+  );
+}
+
+export default function LogMealPage() {
+  return (
+    <Suspense>
+      <LogMealForm />
+    </Suspense>
   );
 }
