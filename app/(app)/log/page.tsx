@@ -16,6 +16,9 @@ export default function LogMealPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set once an insert has succeeded despite a photo-upload failure (the one case where we
+  // stay on this page afterward). Locks the form so a second click can't insert a duplicate row.
+  const [savedWithoutPhoto, setSavedWithoutPhoto] = useState(false);
 
   function handleCapture(file: File) {
     setPhotoFile(file);
@@ -89,8 +92,12 @@ export default function LogMealPage() {
       return;
     }
     // Meal data is saved either way. If the photo upload failed, stay on the page so the
-    // warning stays visible instead of redirecting it out from under the user.
-    if (uploadError) return;
+    // warning stays visible instead of redirecting it out from under the user — but lock
+    // the form so they can't click 确认保存 again and insert a duplicate row.
+    if (uploadError) {
+      setSavedWithoutPhoto(true);
+      return;
+    }
     router.push('/');
     router.refresh();
   }
@@ -105,7 +112,7 @@ export default function LogMealPage() {
         <img src={previewUrl} alt="Meal preview" className="w-full rounded" />
       )}
 
-      {previewUrl && (
+      {previewUrl && !savedWithoutPhoto && (
         <input
           type="text"
           placeholder="补充材料说明 (例如: low fat milk, light mayo)"
@@ -127,7 +134,7 @@ export default function LogMealPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {analysis && (
+      {analysis && !savedWithoutPhoto && (
         <div className="space-y-3">
           <label className="block text-sm">食物描述
             <input className="mt-1 w-full rounded border px-3 py-2" value={analysis.description}
@@ -153,6 +160,12 @@ export default function LogMealPage() {
             {saving ? 'Saving…' : '确认保存'}
           </button>
         </div>
+      )}
+
+      {savedWithoutPhoto && (
+        <p className="rounded border border-gray-300 bg-gray-50 py-2 text-center text-sm text-gray-700">
+          已保存 (相片上传失败, 数值已记录)
+        </p>
       )}
     </main>
   );
