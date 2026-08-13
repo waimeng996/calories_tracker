@@ -96,7 +96,7 @@ export function checkGoalSafety(input: GoalCheckInput): GoalCheckResult {
 
   let suggestedTargetDate: string | null = null;
   if (!isSafe) {
-    const safeWeeks = requestedWeeklyChangeKg / maxSafeWeeklyChangeKg;
+    const safeWeeks = Math.abs(totalChangeKg) / maxSafeWeeklyChangeKg;
     const suggested = new Date(today.getTime() + safeWeeks * msPerWeek);
     suggestedTargetDate = suggested.toISOString().slice(0, 10);
   }

@@ -88,4 +88,23 @@ describe('checkGoalSafety', () => {
     expect(result.maxSafeWeeklyChangeKg).toBeCloseTo(0.6, 2);
     expect(result.isSafe).toBe(false);
   });
+
+  it('suggests a safe target date weeks in the future for unsafe goals', () => {
+    // 20kg loss in 12 weeks (1.667/week) exceeds 0.8kg/week cap
+    // Safe pace: 20kg / 0.8kg/week = 25 weeks from Aug 14 = ~Feb 5, 2027
+    const result = checkGoalSafety({
+      currentWeightKg: 80,
+      targetWeightKg: 60,
+      targetDate: '2026-11-06',
+      today: '2026-08-14',
+    });
+    expect(result.isSafe).toBe(false);
+    expect(result.suggestedTargetDate).not.toBeNull();
+    // Safe date should be ~25 weeks away, roughly Feb 2027, not Aug 2026
+    const suggestedDate = new Date(result.suggestedTargetDate!);
+    const minSafeDate = new Date('2027-02-01');
+    const maxSafeDate = new Date('2027-02-10');
+    expect(suggestedDate.getTime()).toBeGreaterThanOrEqual(minSafeDate.getTime());
+    expect(suggestedDate.getTime()).toBeLessThanOrEqual(maxSafeDate.getTime());
+  });
 });
