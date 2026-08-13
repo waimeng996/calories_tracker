@@ -65,16 +65,16 @@ export default function LogMealPage() {
     const { error: uploadError } = await supabase.storage.from('meal-photos').upload(storagePath, compressed, {
       contentType: 'image/jpeg',
     });
+    // Photo upload failure must not block saving the meal's nutrition data — fall through
+    // with photo_url: null (nullable column) and just warn instead of aborting.
     if (uploadError) {
-      setError(uploadError.message);
-      setSaving(false);
-      return;
+      setError(`相片上传失败, 已保存营养数据 (可重试上传): ${uploadError.message}`);
     }
 
     const { error: insertError } = await supabase.from('meal_logs').insert({
       id: mealId,
       user_id: user.id,
-      photo_url: storagePath,
+      photo_url: uploadError ? null : storagePath,
       user_note: note || null,
       ai_raw_description: analysis.description || null,
       calories: analysis.calories,
@@ -88,6 +88,9 @@ export default function LogMealPage() {
       setError(insertError.message);
       return;
     }
+    // Meal data is saved either way. If the photo upload failed, stay on the page so the
+    // warning stays visible instead of redirecting it out from under the user.
+    if (uploadError) return;
     router.push('/');
     router.refresh();
   }
@@ -102,23 +105,24 @@ export default function LogMealPage() {
         <img src={previewUrl} alt="Meal preview" className="w-full rounded" />
       )}
 
+      {previewUrl && (
+        <input
+          type="text"
+          placeholder="补充材料说明 (例如: low fat milk, light mayo)"
+          className="w-full rounded border px-3 py-2"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+      )}
+
       {previewUrl && !analysis && (
-        <>
-          <input
-            type="text"
-            placeholder="补充材料说明 (例如: low fat milk, light mayo)"
-            className="w-full rounded border px-3 py-2"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-          <button
-            onClick={handleAnalyze}
-            disabled={analyzing}
-            className="w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50"
-          >
-            {analyzing ? '分析中…' : 'AI 分析'}
-          </button>
-        </>
+        <button
+          onClick={handleAnalyze}
+          disabled={analyzing}
+          className="w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50"
+        >
+          {analyzing ? '分析中…' : 'AI 分析'}
+        </button>
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
