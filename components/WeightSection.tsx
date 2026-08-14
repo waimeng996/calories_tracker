@@ -22,15 +22,17 @@ const PLOT_HEIGHT = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
 // How many date labels to show along the x-axis, regardless of how many days of data.
 const MAX_X_LABELS = 5;
 
-function plotPoints(values: number[]): { x: number; y: number }[] {
-  if (values.length === 0) return [];
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+function valueToY(v: number, min: number, max: number): number {
   const range = max - min || 1; // avoid divide-by-zero when all values are equal
+  return PAD_TOP + PLOT_HEIGHT - ((v - min) / range) * PLOT_HEIGHT;
+}
+
+function plotPoints(values: number[], min: number, max: number): { x: number; y: number }[] {
+  if (values.length === 0) return [];
   const stepX = values.length > 1 ? PLOT_WIDTH / (values.length - 1) : 0;
   return values.map((v, i) => ({
     x: PAD_LEFT + i * stepX,
-    y: PAD_TOP + PLOT_HEIGHT - ((v - min) / range) * PLOT_HEIGHT,
+    y: valueToY(v, min, max),
   }));
 }
 
@@ -38,9 +40,25 @@ function toPolyline(points: { x: number; y: number }[]): string {
   return points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
 }
 
+// Day-first (DD/MM), matching how the user reads dates elsewhere in the app.
 function formatShortDate(dateKey: string): string {
   const [, m, d] = dateKey.split('-');
-  return `${m}/${d}`;
+  return `${d}/${m}`;
+}
+
+// Round-number kg gridlines (e.g. 50/60/70/80/90 style), not just min/max.
+function niceKgTicks(min: number, max: number, targetCount = 4): number[] {
+  if (min === max) return [min];
+  const rawStep = (max - min) / targetCount;
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+  const residual = rawStep / magnitude;
+  const niceResidual = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
+  const step = niceResidual * magnitude;
+  const ticks: number[] = [];
+  for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) {
+    ticks.push(Math.round(v * 10) / 10);
+  }
+  return ticks.length > 0 ? ticks : [min, max];
 }
 
 export default function WeightSection({ todayKey, heightCm, logs }: WeightSectionProps) {
@@ -107,17 +125,25 @@ export default function WeightSection({ todayKey, heightCm, logs }: WeightSectio
 
       {sorted.length > 0 && (() => {
         const weights = sorted.map((e) => e.weightKg);
-        const points = plotPoints(weights);
         const minKg = Math.min(...weights);
         const maxKg = Math.max(...weights);
+        const points = plotPoints(weights, minKg, maxKg);
+        const kgTicks = niceKgTicks(minKg, maxKg);
         const xLabelStep = Math.max(1, Math.ceil(sorted.length / MAX_X_LABELS));
         const selected = selectedIndex !== null ? { entry: sorted[selectedIndex], point: points[selectedIndex] } : null;
 
         return (
           <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="mb-3 w-full rounded-lg" style={{ background: '#F7FAFD' }}>
-            {/* y-axis kg labels */}
-            <text x={2} y={PAD_TOP + 4} fontSize="7" fill="#9CA3AF">{maxKg}</text>
-            <text x={2} y={PAD_TOP + PLOT_HEIGHT} fontSize="7" fill="#9CA3AF">{minKg}</text>
+            {/* y-axis kg gridlines + labels */}
+            {kgTicks.map((tick) => {
+              const y = valueToY(tick, minKg, maxKg);
+              return (
+                <g key={tick}>
+                  <line x1={PAD_LEFT} y1={y} x2={CHART_WIDTH - PAD_RIGHT} y2={y} stroke="#E5EAF0" strokeWidth="1" />
+                  <text x={2} y={y + 2.5} fontSize="7" fill="#9CA3AF">{tick}</text>
+                </g>
+              );
+            })}
 
             {/* x-axis date labels */}
             {sorted.map((e, i) =>
@@ -130,7 +156,7 @@ export default function WeightSection({ todayKey, heightCm, logs }: WeightSectio
 
             <polyline points={toPolyline(points)} fill="none" stroke="#7F77DD" strokeWidth="2" />
             <polyline
-              points={toPolyline(plotPoints(trend.movingAvg.map((e) => e.avgKg)))}
+              points={toPolyline(plotPoints(trend.movingAvg.map((e) => e.avgKg), minKg, maxKg))}
               fill="none"
               stroke="#999"
               strokeWidth="1.5"
