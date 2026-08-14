@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { calculateBMR, calculateTDEE, calculateDailyTargets, checkGoalSafety } from './nutrition';
+import {
+  calculateBMR,
+  calculateTDEE,
+  calculateDailyTargets,
+  checkGoalSafety,
+  calculateBMI,
+  suggestWaterMl,
+  summarizeWeightTrend,
+} from './nutrition';
 
 describe('calculateBMR', () => {
   it('computes Mifflin-St Jeor BMR for a male', () => {
@@ -107,5 +115,69 @@ describe('checkGoalSafety', () => {
     const maxSafeDate = new Date('2027-02-10');
     expect(suggestedDate.getTime()).toBeGreaterThanOrEqual(minSafeDate.getTime());
     expect(suggestedDate.getTime()).toBeLessThanOrEqual(maxSafeDate.getTime());
+  });
+});
+
+describe('calculateBMI', () => {
+  it('categorizes underweight', () => {
+    expect(calculateBMI(50, 175)).toEqual({ bmi: 16.3, category: '偏瘦' });
+  });
+
+  it('categorizes normal', () => {
+    expect(calculateBMI(68, 175)).toEqual({ bmi: 22.2, category: '正常' });
+  });
+
+  it('categorizes overweight', () => {
+    expect(calculateBMI(80, 175)).toEqual({ bmi: 26.1, category: '超重' });
+  });
+
+  it('categorizes obese', () => {
+    expect(calculateBMI(95, 175)).toEqual({ bmi: 31, category: '肥胖' });
+  });
+});
+
+describe('suggestWaterMl', () => {
+  it('suggests 33ml per kg of body weight', () => {
+    expect(suggestWaterMl(68)).toBe(2244);
+  });
+});
+
+describe('summarizeWeightTrend', () => {
+  it('returns null trend with fewer than 2 entries', () => {
+    const result = summarizeWeightTrend([{ date: '2026-08-14', weightKg: 70 }]);
+    expect(result.weeklyChangeKg).toBeNull();
+    expect(result.isSafe).toBeNull();
+    expect(result.movingAvg).toEqual([{ date: '2026-08-14', avgKg: 70 }]);
+  });
+
+  it('computes a 7-day moving average and weekly change', () => {
+    const logs = [
+      { date: '2026-08-08', weightKg: 70 },
+      { date: '2026-08-15', weightKg: 69.3 },
+    ];
+    const result = summarizeWeightTrend(logs);
+    expect(result.weeklyChangeKg).toBeCloseTo(-0.7, 2);
+    // max safe = min(1, 69.3*0.01=0.693); 0.7kg/week exceeds it
+    expect(result.isSafe).toBe(false);
+  });
+
+  it('flags an unsafe weekly change', () => {
+    const logs = [
+      { date: '2026-08-08', weightKg: 70 },
+      { date: '2026-08-15', weightKg: 68 },
+    ];
+    const result = summarizeWeightTrend(logs);
+    expect(result.weeklyChangeKg).toBeCloseTo(-2, 2);
+    expect(result.isSafe).toBe(false);
+  });
+
+  it('ignores entries older than 7 days when computing weekly change', () => {
+    const logs = [
+      { date: '2026-07-01', weightKg: 90 }, // far outside the trailing 7-day window
+      { date: '2026-08-08', weightKg: 70 },
+      { date: '2026-08-15', weightKg: 69.5 },
+    ];
+    const result = summarizeWeightTrend(logs);
+    expect(result.weeklyChangeKg).toBeCloseTo(-0.5, 2);
   });
 });

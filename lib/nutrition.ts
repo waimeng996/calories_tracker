@@ -62,6 +62,70 @@ export function calculateDailyTargets(input: ProfileInput, dailyCalorieAdjustmen
   };
 }
 
+export interface BMIResult {
+  bmi: number;
+  category: '偏瘦' | '正常' | '超重' | '肥胖';
+}
+
+export function calculateBMI(weightKg: number, heightCm: number): BMIResult {
+  const heightM = heightCm / 100;
+  const bmi = weightKg / (heightM * heightM);
+  const category: BMIResult['category'] =
+    bmi < 18.5 ? '偏瘦' : bmi < 24 ? '正常' : bmi < 28 ? '超重' : '肥胖';
+  return { bmi: Math.round(bmi * 10) / 10, category };
+}
+
+const ML_PER_KG_WATER = 33;
+
+export function suggestWaterMl(weightKg: number): number {
+  return Math.round(weightKg * ML_PER_KG_WATER);
+}
+
+export interface WeightLogEntry {
+  date: string; // YYYY-MM-DD
+  weightKg: number;
+}
+
+export interface WeightTrend {
+  movingAvg: { date: string; avgKg: number }[];
+  /** Change per week over the trailing 7 days; null when fewer than 2 entries in that window. */
+  weeklyChangeKg: number | null;
+  isSafe: boolean | null;
+}
+
+const MOVING_AVG_WINDOW_DAYS = 7;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+export function summarizeWeightTrend(logs: WeightLogEntry[]): WeightTrend {
+  const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+
+  const movingAvg = sorted.map((entry, i) => {
+    const window = sorted.slice(Math.max(0, i - MOVING_AVG_WINDOW_DAYS + 1), i + 1);
+    const avgKg = window.reduce((sum, e) => sum + e.weightKg, 0) / window.length;
+    return { date: entry.date, avgKg: Math.round(avgKg * 100) / 100 };
+  });
+
+  if (sorted.length < 2) {
+    return { movingAvg, weeklyChangeKg: null, isSafe: null };
+  }
+
+  const last = sorted[sorted.length - 1];
+  const windowStartMs = new Date(last.date).getTime() - MOVING_AVG_WINDOW_DAYS * MS_PER_DAY;
+  const window = sorted.filter((e) => new Date(e.date).getTime() >= windowStartMs);
+  if (window.length < 2) {
+    return { movingAvg, weeklyChangeKg: null, isSafe: null };
+  }
+
+  const first = window[0];
+  const daysBetween = (new Date(last.date).getTime() - new Date(first.date).getTime()) / MS_PER_DAY;
+  const weeks = Math.max(daysBetween / 7, 1 / 7);
+  const weeklyChangeKg = (last.weightKg - first.weightKg) / weeks;
+  const maxSafeWeeklyChangeKg = Math.min(MAX_SAFE_WEEKLY_CHANGE_KG_ABS, last.weightKg * MAX_SAFE_WEEKLY_CHANGE_PCT);
+  const isSafe = Math.abs(weeklyChangeKg) <= maxSafeWeeklyChangeKg;
+
+  return { movingAvg, weeklyChangeKg: Math.round(weeklyChangeKg * 100) / 100, isSafe };
+}
+
 export interface GoalCheckInput {
   currentWeightKg: number;
   targetWeightKg: number;

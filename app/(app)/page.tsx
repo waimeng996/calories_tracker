@@ -3,6 +3,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import CalorieRing from '@/components/CalorieRing';
 import MacroBar from '@/components/MacroBar';
 import MealCard from '@/components/MealCard';
+import WeightSection from '@/components/WeightSection';
 import { redirect } from 'next/navigation';
 import { dayRangeInTimezone, toMalaysiaLocal } from '@/lib/date';
 
@@ -49,6 +50,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     .gte('logged_at', start)
     .lte('logged_at', end)
     .order('logged_at', { ascending: true });
+
+  const thirtyDaysAgoKey = new Date(new Date(`${todayKey}T00:00:00.000Z`).getTime() - 30 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const { data: weightLogs } = await supabase
+    .from('weight_logs')
+    .select('date, weight_kg')
+    .eq('user_id', user.id)
+    .gte('date', thirtyDaysAgoKey)
+    .order('date', { ascending: true });
 
   const consumed = (meals ?? []).reduce(
     (acc, m) => ({
@@ -119,6 +130,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
           <MacroBar label="脂肪" consumed={consumed.fat} target={Number(profile.daily_fat_g)} color="coral" />
         </div>
       </div>
+
+      <WeightSection
+        todayKey={todayKey}
+        heightCm={Number(profile.height_cm)}
+        logs={(weightLogs ?? []).map((w) => ({ date: w.date, weightKg: Number(w.weight_kg) }))}
+      />
 
       {MEAL_SECTIONS.map((section) => {
         const entries = mealsWithPhotos.filter((m) => (m.meal_type ?? 'snack') === section.type);
