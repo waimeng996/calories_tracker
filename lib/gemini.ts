@@ -66,6 +66,11 @@ export function parseGeminiResponse(raw: string): FoodAnalysis {
   };
 }
 
+// Bound how long we wait on Gemini. Without this, a slow response leaves the connection
+// idle until some network proxy on the user's path kills it with its own generic timeout
+// page (e.g. "Inactivity Timeout") instead of a JSON error we control.
+const GEMINI_TIMEOUT_MS = 20_000;
+
 export async function analyzeFoodPhoto(
   imageBase64: string,
   mimeType: string,
@@ -77,10 +82,19 @@ export async function analyzeFoodPhoto(
   // live against this key. Pin to a dated version if reproducibility across model updates matters.
   const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
-  const result = await model.generateContent([
-    buildPrompt(userNote),
-    { inlineData: { data: imageBase64, mimeType } },
-  ]);
+  let result;
+  try {
+    result = await model.generateContent(
+      [buildPrompt(userNote), { inlineData: { data: imageBase64, mimeType } }],
+      { timeout: GEMINI_TIMEOUT_MS }
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.toLowerCase().includes('timeout') || message.toLowerCase().includes('abort')) {
+      throw new GeminiParseError('AI 分析超时, 请重试或手动输入营养数据');
+    }
+    throw err;
+  }
 
   const text = result.response.text();
   return parseGeminiResponse(text);
