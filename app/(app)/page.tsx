@@ -4,6 +4,7 @@ import CalorieRing from '@/components/CalorieRing';
 import MacroBar from '@/components/MacroBar';
 import MealCard from '@/components/MealCard';
 import WeightSection from '@/components/WeightSection';
+import DateStrip from '@/components/DateStrip';
 import { redirect } from 'next/navigation';
 import { dayRangeInTimezone, toMalaysiaLocal } from '@/lib/date';
 
@@ -14,19 +15,17 @@ const MEAL_SECTIONS = [
   { type: 'snack', label: '小食', color: '#D4537E' },
 ] as const;
 
-const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
+const STRIP_DAYS = 60;
 
-// Monday-first week (as YYYY-MM-DD date keys) containing dateKey. Pure calendar-date
+// Ascending date keys from (todayKey - STRIP_DAYS + 1) to todayKey. Pure calendar-date
 // arithmetic on the key itself — no timezone offset needed here, dateKey is already
-// a Malaysia-local calendar day.
-function weekDateKeys(dateKey: string): string[] {
-  const d = new Date(`${dateKey}T00:00:00.000Z`);
-  const dayOfWeek = (d.getUTCDay() + 6) % 7; // 0 = Monday
-  const monday = new Date(d);
-  monday.setUTCDate(d.getUTCDate() - dayOfWeek);
-  return Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(monday);
-    day.setUTCDate(monday.getUTCDate() + i);
+// a Malaysia-local calendar day. Selecting an older date via the calendar picker still
+// works even though it falls outside this strip — the dashboard query isn't range-limited.
+function recentDateKeys(todayKey: string): string[] {
+  const today = new Date(`${todayKey}T00:00:00.000Z`);
+  return Array.from({ length: STRIP_DAYS }, (_, i) => {
+    const day = new Date(today);
+    day.setUTCDate(today.getUTCDate() - (STRIP_DAYS - 1 - i));
     return day.toISOString().slice(0, 10);
   });
 }
@@ -91,26 +90,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         </div>
       )}
 
-      <div className="flex justify-between">
-        {weekDateKeys(selectedDate).map((dateKey, i) => {
-          const isSelected = dateKey === selectedDate;
-          return (
-            <Link key={dateKey} href={`/?date=${dateKey}`} className="flex flex-col items-center gap-1">
-              <span className="text-xs text-gray-400">{WEEKDAY_LABELS[i]}</span>
-              <span
-                className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-sm"
-                style={
-                  isSelected
-                    ? { background: '#7F77DD', color: '#fff', fontWeight: 500, border: '2px solid #26215C' }
-                    : { background: '#CECBF6', color: '#26215C' }
-                }
-              >
-                {Number(dateKey.slice(8, 10))}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
+      <DateStrip dateKeys={recentDateKeys(todayKey)} selectedDate={selectedDate} />
 
       <div className="rounded-2xl bg-white p-5">
         <div className="flex items-center justify-between gap-2">
