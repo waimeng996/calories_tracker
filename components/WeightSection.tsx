@@ -12,20 +12,35 @@ interface WeightSectionProps {
 
 const CHART_WIDTH = 280;
 const CHART_HEIGHT = 90;
+// Reserve space around the plot area for axis labels.
+const PAD_LEFT = 30;
+const PAD_RIGHT = 6;
+const PAD_TOP = 8;
+const PAD_BOTTOM = 16;
+const PLOT_WIDTH = CHART_WIDTH - PAD_LEFT - PAD_RIGHT;
+const PLOT_HEIGHT = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+// How many date labels to show along the x-axis, regardless of how many days of data.
+const MAX_X_LABELS = 5;
 
-function buildPolylinePoints(values: number[]): string {
-  if (values.length === 0) return '';
+function plotPoints(values: number[]): { x: number; y: number }[] {
+  if (values.length === 0) return [];
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1; // avoid divide-by-zero when all values are equal
-  const stepX = values.length > 1 ? CHART_WIDTH / (values.length - 1) : 0;
-  return values
-    .map((v, i) => {
-      const x = i * stepX;
-      const y = CHART_HEIGHT - ((v - min) / range) * CHART_HEIGHT;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
+  const stepX = values.length > 1 ? PLOT_WIDTH / (values.length - 1) : 0;
+  return values.map((v, i) => ({
+    x: PAD_LEFT + i * stepX,
+    y: PAD_TOP + PLOT_HEIGHT - ((v - min) / range) * PLOT_HEIGHT,
+  }));
+}
+
+function toPolyline(points: { x: number; y: number }[]): string {
+  return points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+}
+
+function formatShortDate(dateKey: string): string {
+  const [, m, d] = dateKey.split('-');
+  return `${m}/${d}`;
 }
 
 export default function WeightSection({ todayKey, heightCm, logs }: WeightSectionProps) {
@@ -37,6 +52,7 @@ export default function WeightSection({ todayKey, heightCm, logs }: WeightSectio
   const [weightInput, setWeightInput] = useState(todayEntry ? String(todayEntry.weightKg) : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   async function handleSave() {
     const weightKg = Number(weightInput);
@@ -89,23 +105,70 @@ export default function WeightSection({ todayKey, heightCm, logs }: WeightSectio
       </div>
       {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
 
-      {sorted.length > 0 && (
-        <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="mb-3 w-full rounded-lg" style={{ background: '#F7FAFD' }}>
-          <polyline
-            points={buildPolylinePoints(sorted.map((e) => e.weightKg))}
-            fill="none"
-            stroke="#7F77DD"
-            strokeWidth="2"
-          />
-          <polyline
-            points={buildPolylinePoints(trend.movingAvg.map((e) => e.avgKg))}
-            fill="none"
-            stroke="#999"
-            strokeWidth="1.5"
-            strokeDasharray="4,3"
-          />
-        </svg>
-      )}
+      {sorted.length > 0 && (() => {
+        const weights = sorted.map((e) => e.weightKg);
+        const points = plotPoints(weights);
+        const minKg = Math.min(...weights);
+        const maxKg = Math.max(...weights);
+        const xLabelStep = Math.max(1, Math.ceil(sorted.length / MAX_X_LABELS));
+        const selected = selectedIndex !== null ? { entry: sorted[selectedIndex], point: points[selectedIndex] } : null;
+
+        return (
+          <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="mb-3 w-full rounded-lg" style={{ background: '#F7FAFD' }}>
+            {/* y-axis kg labels */}
+            <text x={2} y={PAD_TOP + 4} fontSize="7" fill="#9CA3AF">{maxKg}</text>
+            <text x={2} y={PAD_TOP + PLOT_HEIGHT} fontSize="7" fill="#9CA3AF">{minKg}</text>
+
+            {/* x-axis date labels */}
+            {sorted.map((e, i) =>
+              i % xLabelStep === 0 ? (
+                <text key={e.date} x={points[i].x} y={CHART_HEIGHT} fontSize="7" fill="#9CA3AF" textAnchor="middle">
+                  {formatShortDate(e.date)}
+                </text>
+              ) : null
+            )}
+
+            <polyline points={toPolyline(points)} fill="none" stroke="#7F77DD" strokeWidth="2" />
+            <polyline
+              points={toPolyline(plotPoints(trend.movingAvg.map((e) => e.avgKg)))}
+              fill="none"
+              stroke="#999"
+              strokeWidth="1.5"
+              strokeDasharray="4,3"
+            />
+
+            {points.map((p, i) => (
+              <g key={sorted[i].date} onClick={() => setSelectedIndex(selectedIndex === i ? null : i)} style={{ cursor: 'pointer' }}>
+                {/* Invisible larger hit-area — the visible dot is too small to tap reliably. */}
+                <circle cx={p.x} cy={p.y} r={8} fill="transparent" />
+                <circle cx={p.x} cy={p.y} r={selectedIndex === i ? 4 : 2.5} fill="#7F77DD" stroke="#fff" strokeWidth="1" />
+              </g>
+            ))}
+
+            {selected && (
+              <g>
+                <rect
+                  x={Math.min(Math.max(selected.point.x - 20, 0), CHART_WIDTH - 40)}
+                  y={Math.max(selected.point.y - 20, 0)}
+                  width={40}
+                  height={14}
+                  rx={3}
+                  fill="#26215C"
+                />
+                <text
+                  x={Math.min(Math.max(selected.point.x, 20), CHART_WIDTH - 20)}
+                  y={Math.max(selected.point.y - 10, 10)}
+                  fontSize="7"
+                  fill="#fff"
+                  textAnchor="middle"
+                >
+                  {selected.entry.weightKg}kg {formatShortDate(selected.entry.date)}
+                </text>
+              </g>
+            )}
+          </svg>
+        );
+      })()}
 
       {trend.weeklyChangeKg !== null && (
         <p className="text-xs text-gray-600">
