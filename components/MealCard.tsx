@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PhotoLightbox from './PhotoLightbox';
 
 interface MealCardProps {
   id: string;
@@ -16,6 +17,7 @@ export default function MealCard({ id, time, description, calories, insulinUnits
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [zoomed, setZoomed] = useState(false);
 
   async function handleDelete() {
     if (!confirm('确定要删除呢条记录?')) return;
@@ -33,7 +35,14 @@ export default function MealCard({ id, time, description, calories, insulinUnits
 
   return (
     <div className="flex items-center gap-3 rounded-xl bg-white p-3">
-      <div className="h-9 w-9 flex-shrink-0 rounded-lg bg-[#EAF3FC] bg-cover bg-center" style={photoUrl ? { backgroundImage: `url(${photoUrl})` } : undefined} />
+      <div
+        className={`h-9 w-9 flex-shrink-0 rounded-lg bg-[#EAF3FC] bg-cover bg-center ${photoUrl ? 'cursor-pointer' : ''}`}
+        style={photoUrl ? { backgroundImage: `url(${photoUrl})` } : undefined}
+        onClick={photoUrl ? () => setZoomed(true) : undefined}
+        role={photoUrl ? 'button' : undefined}
+        aria-label={photoUrl ? '放大睇相片' : undefined}
+      />
+      {zoomed && photoUrl && <PhotoLightbox src={photoUrl} onClose={() => setZoomed(false)} />}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm">{description}</p>
         <p className="text-xs text-gray-400">
