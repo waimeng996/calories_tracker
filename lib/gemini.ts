@@ -77,10 +77,12 @@ export async function analyzeFoodPhoto(
   userNote: string | null
 ): Promise<FoodAnalysis> {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  // ponytail: 'gemini-2.5-flash' 404s live ("no longer available to new users") as of 2026-08;
-  // 'gemini-flash-latest' is Google's maintained alias for the current flash model, verified
-  // live against this key. Pin to a dated version if reproducibility across model updates matters.
-  const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+  // ponytail: 'gemini-2.0-flash' and 'gemini-2.5-flash' both 404 live as of 2026-08 (retired).
+  // 'gemini-flash-latest' (the thinking-enabled tier) verified live but was hit-or-miss:
+  // "high demand" 503s taking up to 90+s to even fail. 'gemini-flash-lite-latest' has no
+  // "thinking" step (this is structured extraction, not reasoning) and was fast (~1-1.5s)
+  // and healthy when checked. Revisit if it starts 404ing the way the others did.
+  const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
 
   let result;
   try {
