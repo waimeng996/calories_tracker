@@ -48,7 +48,15 @@ function LogMealForm() {
       formData.append('photo', compressed, 'meal.jpg');
       formData.append('note', note);
       const res = await fetch('/api/analyze-food', { method: 'POST', body: formData });
-      const body = await res.json();
+      const raw = await res.text();
+      let body: { error?: string; analysis?: FoodAnalysis };
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        // Response wasn't JSON at all (e.g. an infra-level error page) — surface the raw
+        // text instead of a cryptic "Unexpected token" parse error.
+        throw new Error(raw.slice(0, 200) || 'Analysis failed');
+      }
       if (!res.ok) {
         throw new Error(body.error ?? 'Analysis failed');
       }

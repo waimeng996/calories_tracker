@@ -12,12 +12,18 @@ export class GeminiParseError extends Error {}
 
 export function buildPrompt(userNote: string | null): string {
   const base =
-    'You are a nutrition estimation assistant. Look at the food in this photo and estimate its nutritional ' +
-    'content. Respond with ONLY a JSON object (no markdown, no extra text) with exactly these fields: ' +
-    '"description" (short string naming the food), "calories" (number, kcal), "carbsG" (number, grams), ' +
-    '"proteinG" (number, grams), "fatG" (number, grams). Estimate for the entire visible portion.';
+    'You are a nutrition estimation assistant. Look at the photo — it may show the actual food, or a ' +
+    'nutrition facts label — and estimate nutritional content. Respond with ONLY a JSON object (no markdown, ' +
+    'no extra text) with exactly these fields: "description" (short string naming the food), "calories" ' +
+    '(number, kcal), "carbsG" (number, grams), "proteinG" (number, grams), "fatG" (number, grams). Estimate ' +
+    'for the entire visible portion.';
   if (userNote && userNote.trim().length > 0) {
-    return `${base} The user provided this additional context about the ingredients used: "${userNote.trim()}". Use it to refine your estimate.`;
+    return (
+      `${base} The user describes what they actually consumed: "${userNote.trim()}". Treat this as the ` +
+      'authoritative portion/quantity, overriding "entire visible portion" above. If the photo is a nutrition ' +
+      'facts label (e.g. values per 100g or per serving), read the per-unit values off the label and calculate ' +
+      'the totals for the exact quantity in the note — do not default to the label\'s printed serving size.'
+    );
   }
   return base;
 }

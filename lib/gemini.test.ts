@@ -11,6 +11,12 @@ describe('buildPrompt', () => {
     const prompt = buildPrompt(null);
     expect(prompt).not.toContain('null');
   });
+
+  it('tells the model to treat the note as the authoritative portion, even off a nutrition label', () => {
+    const prompt = buildPrompt('2 teaspoons');
+    expect(prompt).toContain('authoritative portion');
+    expect(prompt).toContain('nutrition facts label');
+  });
 });
 
 describe('parseGeminiResponse', () => {
