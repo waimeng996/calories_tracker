@@ -22,6 +22,14 @@ export function todayRangeInTimezone(offsetHours: number = MALAYSIA_UTC_OFFSET_H
   return dayRangeInTimezone(todayKey, offsetHours);
 }
 
+// Pure calendar-date arithmetic on a YYYY-MM-DD key — no timezone offset needed,
+// the key is already a Malaysia-local calendar day.
+export function addDaysToKey(dateKey: string, deltaDays: number): string {
+  const d = new Date(`${dateKey}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+
 export function toMalaysiaLocal(isoTimestamp: string, offsetHours: number = MALAYSIA_UTC_OFFSET_HOURS) {
   const offsetMs = offsetHours * 60 * 60 * 1000;
   const shifted = new Date(new Date(isoTimestamp).getTime() + offsetMs); // wall-clock time in that TZ, expressed as if UTC

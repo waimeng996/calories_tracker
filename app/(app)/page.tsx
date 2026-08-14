@@ -90,7 +90,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         </div>
       )}
 
-      <DateStrip dateKeys={recentDateKeys(todayKey)} selectedDate={selectedDate} />
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <DateStrip dateKeys={recentDateKeys(todayKey)} selectedDate={selectedDate} />
+        </div>
+        <Link
+          href="/report"
+          aria-label="Summary report"
+          className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full"
+          style={{ background: '#CECBF6', color: '#26215C' }}
+        >
+          📊
+        </Link>
+      </div>
 
       <div className="rounded-2xl bg-white p-5">
         <div className="flex items-center justify-between gap-2">

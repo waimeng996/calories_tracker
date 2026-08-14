@@ -126,6 +126,43 @@ export function summarizeWeightTrend(logs: WeightLogEntry[]): WeightTrend {
   return { movingAvg, weeklyChangeKg: Math.round(weeklyChangeKg * 100) / 100, isSafe };
 }
 
+export interface RangeWeightSummary {
+  startKg: number | null;
+  endKg: number | null;
+  changeKg: number | null;
+  weeklyChangeKg: number | null;
+  isSafe: boolean | null;
+}
+
+// First vs. last weight log within an arbitrary range (e.g. a report's date range) —
+// unlike summarizeWeightTrend, which is always the trailing-7-day window off the latest entry.
+export function summarizeRangeWeightChange(logs: WeightLogEntry[]): RangeWeightSummary {
+  const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length === 0) {
+    return { startKg: null, endKg: null, changeKg: null, weeklyChangeKg: null, isSafe: null };
+  }
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  if (sorted.length < 2 || first.date === last.date) {
+    return { startKg: first.weightKg, endKg: last.weightKg, changeKg: null, weeklyChangeKg: null, isSafe: null };
+  }
+
+  const changeKg = last.weightKg - first.weightKg;
+  const daysBetween = (new Date(last.date).getTime() - new Date(first.date).getTime()) / MS_PER_DAY;
+  const weeks = Math.max(daysBetween / 7, 1 / 7);
+  const weeklyChangeKg = changeKg / weeks;
+  const maxSafeWeeklyChangeKg = Math.min(MAX_SAFE_WEEKLY_CHANGE_KG_ABS, last.weightKg * MAX_SAFE_WEEKLY_CHANGE_PCT);
+  const isSafe = Math.abs(weeklyChangeKg) <= maxSafeWeeklyChangeKg;
+
+  return {
+    startKg: first.weightKg,
+    endKg: last.weightKg,
+    changeKg: Math.round(changeKg * 100) / 100,
+    weeklyChangeKg: Math.round(weeklyChangeKg * 100) / 100,
+    isSafe,
+  };
+}
+
 export interface GoalCheckInput {
   currentWeightKg: number;
   targetWeightKg: number;
