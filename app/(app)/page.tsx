@@ -157,6 +157,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
                     time={toMalaysiaLocal(m.logged_at).timeStr}
                     description={m.ai_raw_description || '未命名'}
                     calories={Number(m.calories)}
+                    carbsG={Number(m.carbs_g)}
+                    proteinG={Number(m.protein_g)}
+                    fatG={Number(m.fat_g)}
                     insulinUnits={m.insulin_units ? Number(m.insulin_units) : null}
                     photoUrl={m.photoUrl}
                   />

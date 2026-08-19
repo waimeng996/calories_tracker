@@ -3,21 +3,26 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PhotoLightbox from './PhotoLightbox';
+import MealEditModal from './MealEditModal';
 
 interface MealCardProps {
   id: string;
   time: string;
   description: string;
   calories: number;
+  carbsG: number;
+  proteinG: number;
+  fatG: number;
   insulinUnits: number | null;
   photoUrl: string | null;
 }
 
-export default function MealCard({ id, time, description, calories, insulinUnits, photoUrl }: MealCardProps) {
+export default function MealCard({ id, time, description, calories, carbsG, proteinG, fatG, insulinUnits, photoUrl }: MealCardProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   async function handleDelete() {
     if (!confirm('确定要删除呢条记录?')) return;
@@ -43,10 +48,25 @@ export default function MealCard({ id, time, description, calories, insulinUnits
         aria-label={photoUrl ? '放大睇相片' : undefined}
       />
       {zoomed && photoUrl && <PhotoLightbox src={photoUrl} onClose={() => setZoomed(false)} />}
-      <div className="min-w-0 flex-1">
+      {editing && (
+        <MealEditModal
+          id={id}
+          description={description}
+          calories={calories}
+          carbsG={carbsG}
+          proteinG={proteinG}
+          fatG={fatG}
+          insulinUnits={insulinUnits}
+          onClose={() => setEditing(false)}
+        />
+      )}
+      <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setEditing(true)}>
         <p className="truncate text-sm">{description}</p>
         <p className="text-xs text-gray-400">
           {time} · {Math.round(calories)} kcal{insulinUnits ? ` · 💉 ${insulinUnits}u` : ''}
+        </p>
+        <p className="text-xs text-gray-400">
+          碳水{Math.round(carbsG)}g · 蛋白{Math.round(proteinG)}g · 脂肪{Math.round(fatG)}g
         </p>
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
