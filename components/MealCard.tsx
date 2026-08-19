@@ -14,10 +14,11 @@ interface MealCardProps {
   proteinG: number;
   fatG: number;
   insulinUnits: number | null;
+  breakdown: string | null;
   photoUrl: string | null;
 }
 
-export default function MealCard({ id, time, description, calories, carbsG, proteinG, fatG, insulinUnits, photoUrl }: MealCardProps) {
+export default function MealCard({ id, time, description, calories, carbsG, proteinG, fatG, insulinUnits, breakdown, photoUrl }: MealCardProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export default function MealCard({ id, time, description, calories, carbsG, prot
           proteinG={proteinG}
           fatG={fatG}
           insulinUnits={insulinUnits}
+          breakdown={breakdown}
           onClose={() => setEditing(false)}
         />
       )}

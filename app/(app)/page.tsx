@@ -161,6 +161,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
                     proteinG={Number(m.protein_g)}
                     fatG={Number(m.fat_g)}
                     insulinUnits={m.insulin_units ? Number(m.insulin_units) : null}
+                    breakdown={m.ai_breakdown}
                     photoUrl={m.photoUrl}
                   />
                 ))}

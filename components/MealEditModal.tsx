@@ -11,6 +11,7 @@ interface MealEditModalProps {
   proteinG: number;
   fatG: number;
   insulinUnits: number | null;
+  breakdown: string | null;
   onClose: () => void;
 }
 
@@ -22,6 +23,7 @@ export default function MealEditModal({
   proteinG,
   fatG,
   insulinUnits,
+  breakdown,
   onClose,
 }: MealEditModalProps) {
   const router = useRouter();
@@ -65,6 +67,12 @@ export default function MealEditModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
       <div className="w-full max-w-md space-y-3 rounded-t-2xl bg-white p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-sm font-medium">编辑记录</h2>
+
+        {breakdown && (
+          <div className="rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 whitespace-pre-wrap">
+            {breakdown}
+          </div>
+        )}
 
         <label className="block text-sm">食物描述
           <input

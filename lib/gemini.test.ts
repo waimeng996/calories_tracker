@@ -35,7 +35,21 @@ describe('parseGeminiResponse', () => {
       carbsG: 55,
       proteinG: 40,
       fatG: 12,
+      breakdown: '',
     });
+  });
+
+  it('includes the breakdown string when the model provides one', () => {
+    const raw = JSON.stringify({
+      description: 'Tuna mayo sandwich',
+      calories: 350,
+      carbsG: 30,
+      proteinG: 15,
+      fatG: 18,
+      breakdown: '2 bread slices ~140kcal; tuna+mayo ~150kcal/14g fat; lettuce negligible',
+    });
+    const result = parseGeminiResponse(raw);
+    expect(result.breakdown).toContain('tuna+mayo');
   });
 
   it('parses JSON wrapped in a markdown code fence', () => {

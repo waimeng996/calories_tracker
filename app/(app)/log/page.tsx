@@ -63,7 +63,7 @@ function LogMealForm() {
       setAnalysis(body.analysis as FoodAnalysis);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI分析失败, 可手动输入营养数据');
-      setAnalysis({ description: '', calories: 0, carbsG: 0, proteinG: 0, fatG: 0 });
+      setAnalysis({ description: '', calories: 0, carbsG: 0, proteinG: 0, fatG: 0, breakdown: '' });
     } finally {
       setAnalyzing(false);
     }
@@ -99,6 +99,7 @@ function LogMealForm() {
       photo_url: uploadError ? null : storagePath,
       user_note: note || null,
       ai_raw_description: analysis.description || null,
+      ai_breakdown: analysis.breakdown || null,
       calories: analysis.calories,
       carbs_g: analysis.carbsG,
       protein_g: analysis.proteinG,
@@ -157,6 +158,11 @@ function LogMealForm() {
 
       {analysis && !savedWithoutPhoto && (
         <div className="space-y-3">
+          {analysis.breakdown && (
+            <div className="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-wrap">
+              {analysis.breakdown}
+            </div>
+          )}
           <label className="block text-sm">食物描述
             <input className="mt-1 w-full rounded border px-3 py-2" value={analysis.description}
               onChange={(e) => setAnalysis({ ...analysis, description: e.target.value })} />
